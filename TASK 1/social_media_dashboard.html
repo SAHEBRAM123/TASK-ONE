@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Social Media Performance Dashboard</h1>
+    <input type="file" id="fileInput" accept=".json">
+    <div id="charts">
+        <div id="bar1"></div>
+        <div id="bar2"></div>
+        <div id="bar3"></div>
+        <div id="bar4"></div>
+        <div id="pie"></div>
+    </div>
+    
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const jsonData = JSON.parse(e.target.result);
+                    generateDashboard(jsonData);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function generateDashboard(data) {
+            // Aggregate Data
+            let userEngagement = {};
+            let postFrequency = {};
+            let sentimentTrend = {};
+            let topLiked = [];
+            let topShared = [];
+            let engagementBreakdown = { Likes: 0, Shares: 0, Comments: 0 };
+            
+            data.forEach(post => {
+                // User Engagement
+                if (!userEngagement[post.User_ID]) userEngagement[post.User_ID] = 0;
+                userEngagement[post.User_ID] += post.Likes + post.Shares + post.Comments;
+                
+                // Post Frequency Over Time
+                let date = post.Timestamp.split('T')[0];
+                postFrequency[date] = (postFrequency[date] || 0) + 1;
+                
+                // Sentiment Trend
+                sentimentTrend[date] = (sentimentTrend[date] || []);
+                sentimentTrend[date].push(post.Sentiment_Score);
+                
+                // Engagement Breakdown
+                engagementBreakdown.Likes += post.Likes;
+                engagementBreakdown.Shares += post.Shares;
+                engagementBreakdown.Comments += post.Comments;
+            });
+            
+            // Compute average sentiment per day
+            Object.keys(sentimentTrend).forEach(date => {
+                let scores = sentimentTrend[date];
+                sentimentTrend[date] = scores.reduce((a, b) => a + b, 0) / scores.length;
+            });
+            
+            // Get top liked and shared posts
+            topLiked = data.sort((a, b) => b.Likes - a.Likes).slice(0, 10);
+            topShared = data.sort((a, b) => b.Shares - a.Shares).slice(0, 10);
+            
+            // Convert data for visualization
+            let users = Object.keys(userEngagement);
+            let engagements = Object.values(userEngagement);
+            let dates = Object.keys(postFrequency);
+            let postsCount = Object.values(postFrequency);
+            let sentimentDates = Object.keys(sentimentTrend);
+            let sentimentScores = Object.values(sentimentTrend);
+            let likedPosts = topLiked.map(p => p.Post_ID);
+            let likedCounts = topLiked.map(p => p.Likes);
+            let sharedPosts = topShared.map(p => p.Post_ID);
+            let sharedCounts = topShared.map(p => p.Shares);
+            
+            // Create charts
+            Plotly.newPlot('bar1', [{x: users, y: engagements, type: 'bar', name: 'Engagement'}], {title: 'Total Engagement per User'});
+            Plotly.newPlot('bar2', [{x: dates, y: postsCount, type: 'bar', name: 'Posts'}], {title: 'Post Frequency Over Time'});
+            Plotly.newPlot('bar3', [{x: sentimentDates, y: sentimentScores, type: 'bar', name: 'Sentiment'}], {title: 'Average Sentiment Score by Day'});
+            Plotly.newPlot('bar4', [
+                {x: likedPosts, y: likedCounts, type: 'bar', name: 'Likes'},
+                {x: sharedPosts, y: sharedCounts, type: 'bar', name: 'Shares'}
+            ], {title: 'Most Liked vs. Most Shared Posts'});
+            Plotly.newPlot('pie', [{
+                labels: Object.keys(engagementBreakdown),
+                values: Object.values(engagementBreakdown),
+                type: 'pie'
+            }], {title: 'Engagement Breakdown'});
+        }
+    </script>
+</body>
+</html>
